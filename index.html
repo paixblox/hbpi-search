@@ -47,6 +47,7 @@ body{font-family:Arial,Helvetica,sans-serif;background:#f4f1e7;color:#122d1d}
 /* HBPI intent navigator */
 .suggest b{display:block;font:800 12px/1.3 Arial,sans-serif;color:#173b24;margin-bottom:4px}
 .intent-grid{display:grid;gap:8px;padding:4px 0 10px}.intent-card{width:100%;border:1px solid #d9d2c3;background:#fbfaf5;border-radius:8px;padding:11px 12px;text-align:left;cursor:pointer;transition:.15s ease}.intent-card:hover{background:#eef2e8;border-color:#aebca8;transform:translateY(-1px)}.intent-card b{display:block;font:800 11px/1.3 Arial,sans-serif;color:#1f512f}.intent-card small{display:block;margin-top:4px;font:9px/1.4 Arial,sans-serif;color:#6f786f}.intent-card.active{background:#e6ece2;border-color:#9aae95}.navigator-back{border:0;background:transparent;color:#245d37;font:700 9px Arial,sans-serif;padding:3px 0 8px;cursor:pointer}.navigator-back:hover{text-decoration:underline}.nav-result{border-bottom:1px solid #e5dfd2;padding:10px 4px}.nav-result:last-child{border-bottom:0}.nav-result .kind{font:700 8px Arial,sans-serif;text-transform:uppercase;letter-spacing:.1em;color:#758075}.nav-result b{display:block;margin:4px 0;font:700 10px/1.35 Arial,sans-serif;color:#26342a}.nav-result p{margin:0 0 6px;font:9px/1.45 Arial,sans-serif;color:#667067}.nav-result a,.nav-result button{border:0;background:transparent;padding:0;color:#1e6236;text-decoration:underline;font:700 9px Arial,sans-serif;cursor:pointer}.nav-empty{padding:18px 6px;color:#6b746c;font:10px/1.5 Arial,sans-serif}.research-term{margin-top:7px;padding:7px 8px;background:#f1f3ed;border-left:2px solid #8ea28c;font:8.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:#566157;word-break:break-word}
+.research-term{display:none!important}
 </style>
 
 <style id="healthy-buck-public-theme">
@@ -119,7 +120,7 @@ body{background:linear-gradient(180deg,#bfe8f5 0%,#c7eee8 48%,#bce7c9 100%);colo
   <aside class="inspector panel">
     <div class="inspect-head"><b>EXPLORE HEALTHY BUCK</b><span id="tocCount">Choose a path</span></div>
     <div class="toc-search"><input id="tocSearch" type="search" placeholder="Search Healthy Buck…" autocomplete="off" /></div>
-    <nav class="toc-list" id="tocList" aria-label="HBPI topic navigator"></nav>
+    <nav class="toc-list" id="tocList" aria-label="topic navigator"></nav>
     <div class="toc-preview" id="tocPreview"><div class="toc-preview-label">Browse topics</div><p>Choose a topic or enter a search.</p></div>
   </aside>
 </div>
@@ -498,218 +499,58 @@ showPaths();
 
 
 
-<script id="hb-public-authoritative-library-v2">
-/* Healthy Buck public search v2
-   - Newsletter articles require a strong query match.
-   - Adds authoritative fallback/search sources.
-   - Keeps PubMed as the always-available research path.
-*/
+<script id="healthy-buck-search-quality-v3">
 (function(){
-  const ARTICLE_STOP=new Set(('the a an and or of to for with from in on at is are am i my me you your can could should would what why how does do help helps about this that it be better more less some natural support show find main resource resources healthy health wellness hbpi').split(' '));
-
-  function cleanTokens(q){
-    return (String(q).toLowerCase().match(/[a-z0-9-]+/g)||[])
-      .filter(w=>w.length>2&&!ARTICLE_STOP.has(w));
-  }
-
-  function includesWord(text,word){
-    return String(text).toLowerCase().includes(word);
-  }
-
+  const STOP=new Set(('the a an and or of to for with from in on at is are am i my me you your can could should would what why how does do help helps about this that it be better more less some natural support show find main resource resources healthy health wellness').split(' '));
+  function cleanTokens(q){return (String(q).toLowerCase().match(/[a-z0-9-]+/g)||[]).filter(w=>w.length>2&&!STOP.has(w));}
+  function norm(s){return String(s).toLowerCase().replace(/[.]/g,' ').replace(/\s+/g,' ').trim()}
+  function hasPhrase(text,phrase){return norm(text).includes(norm(phrase))}
+  const NAMED=[
+    {test:/\bps[- ]?128\b/i,canonical:'Lactiplantibacillus plantarum PS128',article:['ps128','lactiplantibacillus plantarum ps128','lactobacillus plantarum ps128']},
+    {test:/\b(?:s\.?\s*boulardii|saccharomyces\s+boulardii)\b/i,canonical:'Saccharomyces boulardii',article:['s boulardii','saccharomyces boulardii']},
+    {test:/\bsacha\s+inchi\b/i,canonical:'Sacha inchi',article:['sacha inchi']}
+  ];
+  function namedEntity(q){return NAMED.find(x=>x.test.test(q))||null}
   function articleRank(q,a){
-    const qs=cleanTokens(q);
-    const label=String(a[0]||'').toLowerCase();
-    const title=String(a[1]||'').toLowerCase();
-    const desc=String(a[2]||'').toLowerCase();
-    const keys=String(a[4]||'').toLowerCase();
-    let points=0, matched=0;
-
-    qs.forEach(w=>{
-      let hit=false;
-      if(includesWord(title,w)){ points+=4; hit=true; }
-      if(includesWord(keys,w)){ points+=3; hit=true; }
-      if(includesWord(label,w)){ points+=2; hit=true; }
-      if(includesWord(desc,w)){ points+=1; hit=true; }
-      if(hit) matched++;
-    });
-
-    // Reward highly specific phrases/topics without letting generic wellness words force a result.
-    const ql=String(q).toLowerCase();
-    const joined=(label+' '+title+' '+keys);
-    const strong=[
-      ['brain fog',/brain fog/],['acid reflux',/acid reflux|gerd|heartburn/],
-      ['blood sugar',/blood sugar|glucose|insulin/],['3 am',/3 am|waking|cortisol/],
-      ['probiotic',/probiotic|microbiome/],['butyrate',/butyrate/],
-      ['magnesium',/magnesium/],['diosmin',/diosmin/],['hesperidin',/hesperidin/],
-      ['blue vervain',/blue vervain/],['allulose',/allulose/],['sacha inchi',/sacha inchi/],
-      ['serrapeptase',/serrapeptase/],['turmeric',/turmeric/],['omega-3',/omega-3|omega 3/],
-      ['vitamin d',/vitamin d|d3/],['vitamin k',/vitamin k|k2/]
-    ];
-    strong.forEach(([needle,rx])=>{ if(ql.includes(needle)&&rx.test(joined)) points+=6; });
-
+    const entity=namedEntity(q),hay=a.join(' ');if(entity&&!entity.article.some(p=>hasPhrase(hay,p)))return {a,points:-999,matched:0,total:1};
+    const qs=cleanTokens(q),label=String(a[0]||'').toLowerCase(),title=String(a[1]||'').toLowerCase(),desc=String(a[2]||'').toLowerCase(),keys=String(a[4]||'').toLowerCase();let points=0,matched=0;
+    qs.forEach(w=>{let hit=false;if(title.includes(w)){points+=5;hit=true}if(keys.includes(w)){points+=4;hit=true}if(label.includes(w)){points+=2;hit=true}if(desc.includes(w)){points+=1;hit=true}if(hit)matched++});
+    const ql=norm(q),joined=norm(label+' '+title+' '+keys);
+    [['brain fog',/brain fog/],['acid reflux',/acid reflux|gerd|heartburn/],['blood sugar',/blood sugar|glucose|insulin/],['3 am',/3 am|waking|cortisol/],['butyrate',/butyrate/],['magnesium',/magnesium/],['diosmin',/diosmin/],['hesperidin',/hesperidin/],['blue vervain',/blue vervain/],['allulose',/allulose/],['sacha inchi',/sacha inchi/],['serrapeptase',/serrapeptase/],['turmeric',/turmeric/],['omega-3',/omega-3|omega 3/],['vitamin d',/vitamin d|d3/],['vitamin k',/vitamin k|k2/]].forEach(([needle,rx])=>{if(ql.includes(needle)&&rx.test(joined))points+=8});
     return {a,points,matched,total:qs.length};
   }
-
-  function strongNewsletterMatches(q){
-    return ARTICLES
-      .filter(topicMatch)
-      .map(a=>articleRank(q,a))
-      .filter(r=>{
-        if(!r.total) return false;
-        if(r.total===1) return r.matched===1 && r.points>=5;
-        return r.matched>=2 && r.points>=7;
-      })
-      .sort((x,y)=>y.points-x.points)
-      .slice(0,3)
-      .map(r=>r.a);
-  }
-
-  function rankedLibrary(q,pathKey){
-    const rows=LIB.filter(topicMatch).map(a=>[score(q,a.join(' ')),a]);
-    let out=rows.filter(x=>x[0]>1).sort((a,b)=>b[0]-a[0]).slice(0,3).map(x=>x[1]);
-    if(pathKey && !out.length && !['research','tools'].includes(pathKey)){
-      out=LIB.filter(a=>pathMatches(a.join(' '),pathKey)).slice(0,2);
-    }
-    return out;
-  }
-
-  function simpleSearchTerms(q){
-    const terms=cleanTokens(q).slice(0,8);
-    return terms.length?terms.join(' AND '):String(q).trim();
-  }
-
-  function clinicalTrialsUrl(q){
-    return 'https://clinicaltrials.gov/expert-search?term='+encodeURIComponent(simpleSearchTerms(q));
-  }
-
-  function healthDataUrl(q){
-    return 'https://healthdata.gov/browse?q='+encodeURIComponent(cleanTokens(q).slice(0,6).join(' '));
-  }
-
-  function isCompoundQuery(q,pathKey){
-    return pathKey==='natural' || /\b(herb|herbal|supplement|compound|botanical|vitamin|mineral|magnesium|zinc|iron|calcium|folate|turmeric|curcumin|ginseng|ashwagandha|valerian|melatonin|probiotic|omega[- ]?3|fish oil|coq10|coenzyme q10|garlic|ginger|cinnamon|elderberry|echinacea|milk thistle|st john|saw palmetto|chamomile|lavender|green tea|flaxseed|cranberry|berberine|nac|resveratrol|quercetin|creatine)\b/i.test(q);
-  }
-
-  function isCancerQuery(q){
-    return /\b(cancer|tumou?r|oncolog|carcinoma|melanoma|leukemia|lymphoma|sarcoma|neoplasm|histolog|morpholog|icd-o|malignan|metast)/i.test(q);
-  }
-
-  function isDataQuery(q){
-    return /\b(data|dataset|statistics|rate|rates|trend|trends|prevalence|incidence|mortality|population|demographic|surveillance|epidemiolog|public health)\b/i.test(q);
-  }
-
-  function isClinicalQuery(q){
-    return /\b(clinical trial|trial|trials|study|studies|treatment|therapy|intervention|drug|medication|experimental|recruiting)\b/i.test(q);
-  }
-
-  function authoritativeCards(q,pathKey,hasArticle){
-    let cards='';
-    const compound=isCompoundQuery(q,pathKey);
-    const cancer=isCancerQuery(q);
-    const data=isDataQuery(q);
-    const clinical=isClinicalQuery(q);
-    const fallback=!hasArticle || pathKey==='research';
-
-    if(compound){
-      cards+=resultCard(
-        'Reference · MedlinePlus',
-        'Herbs & Supplements A–Z',
-        'Browse NIH-linked information on herbs, vitamins, minerals, supplements, effectiveness, dosing and interactions.',
-        '<a class="result-link" href="https://medlineplus.gov/druginfo/herb_All.html" target="_blank" rel="noopener">Open herbs & supplements</a>'
-      );
-    }
-
-    if(cancer){
-      cards+=resultCard(
-        'Cancer reference · SEER',
-        'Cancer PathCHART Search',
-        'Explore tumor site, histology, behavior and Cancer PathCHART registration standards using the SEER search tool.',
-        '<a class="result-link" href="https://seer.cancer.gov/cancerpathchart/search/" target="_blank" rel="noopener">Open SEER search</a>'
-      );
-    }
-
-    if(clinical || cancer || compound || fallback){
-      cards+=resultCard(
-        'Clinical studies · ClinicalTrials.gov',
-        'Search registered clinical studies',
-        'Open ClinicalTrials.gov with search terms prepared from this question.',
-        `<a class="result-link" href="${clinicalTrialsUrl(q)}" target="_blank" rel="noopener">Search clinical studies</a><div class="research-term">${esc(simpleSearchTerms(q))}</div>`
-      );
-    }
-
-    if(data || fallback){
-      cards+=resultCard(
-        'Government data · HealthData.gov',
-        'Search HHS open health data',
-        'Search the HHS open-data catalog for datasets and public-health resources related to this topic.',
-        `<a class="result-link" href="${healthDataUrl(q)}" target="_blank" rel="noopener">Search health data</a>`
-      );
-    }
-
-    return cards;
-  }
-
-  function publicResourceMatches(q,pathKey){
-    if(pathKey==='tools') return TOOLS.slice(0,4);
-    const ql=String(q).toLowerCase();
-    return TOOLS
-      .filter(a=>{
-        const name=String(a[0]);
-        if(name==='Healthy Buck Newsletter' && !/newsletter|article|substack|healthy buck/.test(ql)) return false;
-        if(name==='Become a Member' && !/member|membership|join|subscribe|subscription|access/.test(ql)) return false;
-        if(name==='Healthy Buck Home' && !/healthy buck|home|about|website/.test(ql)) return false;
-        return true;
-      })
-      .map(a=>[score(q,a.join(' ')),a])
-      .filter(x=>x[0]>2)
-      .sort((a,b)=>b[0]-a[0])
-      .slice(0,2)
-      .map(x=>x[1]);
-  }
-
-  window.answerText=function(q,arts,libs){
-    const ql=String(q).toLowerCase();
-    if(/chest pain|stroke|suicid|overdose|severe shortness|difficulty breathing/.test(ql)){
-      return 'This may involve symptoms that should not be handled by an educational wellness search alone. Use appropriate urgent or emergency care when needed. The links below are for background education only.';
-    }
-    if(arts.length){
-      return 'Here are results related to your question.';
-    }
-    if(libs.length){
-      return 'Here are results related to your question.';
-    }
-    return 'Here are results related to your question.';
+  function strongArticleMatches(q){return ARTICLES.filter(topicMatch).map(a=>articleRank(q,a)).filter(r=>{if(r.points<0||!r.total)return false;if(r.total===1)return r.matched===1&&r.points>=6;return r.matched>=2&&r.points>=9}).sort((x,y)=>y.points-x.points).slice(0,3).map(r=>r.a)}
+  function rankedLibrary(q,pathKey){if(namedEntity(q))return [];const rows=LIB.filter(topicMatch).map(a=>[score(q,a.join(' ')),a]);let out=rows.filter(x=>x[0]>2).sort((a,b)=>b[0]-a[0]).slice(0,3).map(x=>x[1]);if(pathKey&&!out.length&&!['research','tools'].includes(pathKey))out=LIB.filter(a=>pathMatches(a.join(' '),pathKey)).slice(0,2);return out}
+  function queryTerm(q){const ent=namedEntity(q);return ent?ent.canonical:String(q).trim()}
+  function pubUrlExact(q,review=false){let term='('+queryTerm(q)+')';if(review)term+=' AND review[Publication Type]';return 'https://pubmed.ncbi.nlm.nih.gov/?term='+encodeURIComponent(term)}
+  function simpleSearchTerms(q){const ent=namedEntity(q);if(ent)return ent.canonical;const terms=cleanTokens(q).slice(0,8);return terms.length?terms.join(' AND '):String(q).trim()}
+  function clinicalTrialsUrl(q){return 'https://clinicaltrials.gov/search?term='+encodeURIComponent(simpleSearchTerms(q))}
+  function healthDataUrl(q){return 'https://healthdata.gov/browse?q='+encodeURIComponent(cleanTokens(q).slice(0,6).join(' '))}
+  const SPECIAL={scoliosis:[
+    ['Condition guide · MedlinePlus','Scoliosis','Overview of scoliosis, diagnosis, treatment options, related resources, clinical trials, and journal articles.','https://medlineplus.gov/scoliosis.html','Read guide'],
+    ['NIH condition guide · NIAMS','Scoliosis in Children and Teens','NIH guidance on symptoms, causes, diagnosis, and treatment of scoliosis.','https://www.niams.nih.gov/health-topics/scoliosis','Read NIH guide'],
+    ['Medical encyclopedia · MedlinePlus','Scoliosis Medical Encyclopedia','Detailed background on causes, symptoms, testing, treatment, and follow-up.','https://medlineplus.gov/ency/article/001241.htm','Read overview']
+  ]};
+  function specialCards(q){let rows=[];if(/\bscoliosis\b/.test(norm(q)))rows=SPECIAL.scoliosis;return rows.map(r=>resultCard(r[0],r[1],r[2],`<a class="result-link" href="${r[3]}" target="_blank" rel="noopener">${r[4]}</a>`))}
+  function authorityCards(q,pathKey){const cards=[];
+    cards.push(resultCard('Research · PubMed','Research articles','Search PubMed for studies directly related to this topic.',`<a class="result-link" href="${pubUrlExact(q)}" target="_blank" rel="noopener">Find research</a><a class="result-link secondary" href="${pubUrlExact(q,true)}" target="_blank" rel="noopener">Find reviews</a>`));
+    cards.push(resultCard('Clinical studies · ClinicalTrials.gov','Registered clinical studies','Search registered studies and trials related to this topic.',`<a class="result-link" href="${clinicalTrialsUrl(q)}" target="_blank" rel="noopener">Search studies</a>`));
+    cards.push(resultCard('Government health data · HealthData.gov','Public health data','Search HHS open health data and public-health resources related to this topic.',`<a class="result-link" href="${healthDataUrl(q)}" target="_blank" rel="noopener">Search health data</a>`));
+    if(/\b(herb|herbal|supplement|botanical|vitamin|mineral|magnesium|zinc|iron|calcium|turmeric|curcumin|ginseng|ashwagandha|valerian|melatonin|probiotic|sacha|inchi|ps[- ]?128|boulardii|omega[- ]?3|fish oil|coq10|garlic|ginger|cinnamon|elderberry|echinacea|milk thistle|chamomile|green tea|flaxseed|cranberry|berberine|nac|resveratrol|quercetin|creatine)\b/i.test(q)||pathKey==='natural')cards.push(resultCard('Reference · MedlinePlus','Herbs & Supplements','Browse National Library of Medicine links for herbs, nutrients, supplements, dosing, effectiveness, and interactions.','<a class="result-link" href="https://medlineplus.gov/druginfo/herb_All.html" target="_blank" rel="noopener">Browse supplements</a>'));
+    return cards}
+  function toolMatches(q,pathKey){if(pathKey==='tools')return TOOLS.slice(0,4);return TOOLS.map(a=>[score(q,a.join(' ')),a]).filter(x=>x[0]>3).sort((a,b)=>b[0]-a[0]).slice(0,1).map(x=>x[1])}
+  function conversationalReply(q){const s=norm(q).replace(/[!?,]/g,'').trim();if(/^(thanks|thank you|thankyou|thanks so much|thank you so much|appreciate it|i appreciate it)$/.test(s))return 'You’re welcome — glad I could help.';if(/^(hi|hello|hey|good morning|good afternoon|good evening)$/.test(s))return 'Hi! How can I help you today?';if(/^(ok|okay|got it|sounds good)$/.test(s))return 'Absolutely. Search another topic whenever you’re ready.';return null}
+  window.answerText=function(q,arts,libs){const ql=String(q).toLowerCase();if(/chest pain|stroke|suicid|overdose|severe shortness|difficulty breathing/.test(ql))return 'This topic may need prompt medical attention. The links below are for general educational information.';return `Here’s what I found for “${q}”.`};
+  window.run=function(q0,pathKey,source){const input=document.getElementById('input'),q=String(q0??input.value??'').trim();if(!q)return;document.getElementById('welcome')?.remove();addMessage('user',q);const basic=conversationalReply(q);if(basic){addMessage('assistant',`<div class="answer-copy">${esc(basic)}</div>`);input.value='';return}
+    const arts=(pathKey==='research'||pathKey==='tools')?[]:strongArticleMatches(q),libs=(pathKey==='research'||pathKey==='tools')?[]:rankedLibrary(q,pathKey),tools=toolMatches(q,pathKey),cardList=[];
+    arts.forEach(a=>cardList.push(resultCard('Read · Article',a[1],a[2],`<a class="result-link" href="${a[3]}" target="_blank" rel="noopener">Read article</a>`)));
+    libs.forEach(a=>cardList.push(resultCard(a[3]?'Reference':'Related topic',a[0],a[1],`${a[3]?`<a class="result-link" href="${a[3]}" target="_blank" rel="noopener">Open source</a>`:''}<button type="button" class="result-link${a[3]?' secondary':''}" data-reask="${esc(a[0])}">Search this topic</button>`)));
+    specialCards(q).forEach(c=>cardList.push(c));authorityCards(q,pathKey).forEach(c=>cardList.push(c));tools.forEach(a=>cardList.push(resultCard('Tool',a[0],a[1],`<a class="result-link" href="${a[2]}" target="_blank" rel="noopener">Open tool</a>`)));
+    const unique=[],seen=new Set();for(const c of cardList){const key=c.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,180);if(!seen.has(key)){seen.add(key);unique.push(c)}}const cards=unique.slice(0,8);
+    const footer='I hope this helps. You can search another topic whenever you’re ready.';
+    addMessage('assistant',`<div class="meta"><span>Results</span></div><div class="answer-copy">${esc(answerText(q,arts,libs))}</div><div class="result-grid">${cards.join('')}</div><div class="answer-note">${esc(footer)} Educational information only.</div>`);input.value='';document.querySelectorAll('[data-reask]').forEach(b=>b.onclick=()=>run(b.dataset.reask));
   };
-
-  window.run=function(q0,pathKey,source){
-    const input=document.getElementById('input');
-    const q=String(q0 ?? input.value ?? '').trim();
-    if(!q) return;
-    document.getElementById('welcome')?.remove();
-    addMessage('user',q);
-
-    const arts=(pathKey==='research'||pathKey==='tools') ? [] : strongNewsletterMatches(q);
-    const libs=(pathKey==='research'||pathKey==='tools') ? [] : rankedLibrary(q,pathKey);
-    const resources=publicResourceMatches(q,pathKey);
-
-    let cards='';
-    arts.forEach(a=>cards+=resultCard('Read · Newsletter',a[1],a[2],`<a class="result-link" href="${a[3]}" target="_blank" rel="noopener">Read article</a>`));
-    libs.forEach(a=>cards+=resultCard(a[3]?'Explore · Source':'Explore · Healthy Buck',a[0],a[1],`${a[3]?`<a class="result-link" href="${a[3]}" target="_blank" rel="noopener">Open source</a>`:''}<button type="button" class="result-link${a[3]?' secondary':''}" data-reask="${esc(a[0])}">Ask about this</button>`));
-
-    cards+=resultCard(
-      'Research · PubMed',
-      'Search PubMed for this topic',
-      'Find relevant studies and reviews on PubMed.',
-      `<a class="result-link" href="${pubUrl(q)}" target="_blank" rel="noopener">Find research</a><a class="result-link secondary" href="${pubUrl(q,true)}" target="_blank" rel="noopener">Find reviews</a>`
-    );
-
-    cards+=authoritativeCards(q,pathKey,arts.length>0);
-
-    resources.forEach(a=>cards+=resultCard('Explore · Healthy Buck',a[0],a[1],`<a class="result-link" href="${a[2]}" target="_blank" rel="noopener">Open resource</a>`));
-
-    addMessage('assistant',`<div class="meta"><span>Results</span></div><div class="answer-copy">${esc(answerText(q,arts,libs))}</div><div class="answer-note">Educational information only. Search results are discovery paths, not diagnosis or treatment recommendations.</div><div class="result-grid">${cards}</div>`);
-    input.value='';
-  };
+  const welcome=document.getElementById('welcome');if(welcome){const h=welcome.querySelector('h2'),p=welcome.querySelector('p');if(h)h.textContent='How can I help you today?';if(p)p.textContent='Search a health or wellness topic, supplement, nutrient, condition, or research question.'}
 })();
 </script>
 
