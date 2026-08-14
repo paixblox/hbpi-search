@@ -554,5 +554,88 @@ showPaths();
 })();
 </script>
 
+
+<style id="healthy-buck-free-preview-style">
+  .member-cta-card{grid-column:1/-1;background:linear-gradient(135deg,rgba(229,248,240,.98),rgba(224,244,250,.96));border-color:rgba(49,143,127,.34)}
+  .member-cta-card h4{font-size:15px}
+  .member-cta-card .result-link{display:inline-block;text-decoration:none;background:linear-gradient(135deg,#4fc6b2,#45b7cf);color:#fff;padding:9px 12px;border-radius:7px}
+</style>
+<script id="healthy-buck-free-preview">
+(function(){
+  const SUBSCRIBE_URL='https://healthybuck.substack.com/subscribe?simple=true';
+  const STORAGE_KEY='healthyBuckFreeSearchCount';
+  let memoryCount=0;
+  function searchCount(){try{return Number(sessionStorage.getItem(STORAGE_KEY)||0)}catch(e){return memoryCount}}
+  function markSearch(){memoryCount=searchCount()+1;try{sessionStorage.setItem(STORAGE_KEY,String(memoryCount))}catch(e){}}
+  function words(s){return (String(s).toLowerCase().match(/[a-z0-9-]+/g)||[]).filter(w=>w.length>2)}
+  function articleMatches(q){
+    const qs=words(q);
+    return ARTICLES.map(a=>{
+      const title=String(a[1]||'').toLowerCase(), desc=String(a[2]||'').toLowerCase(), keys=String(a[4]||'').toLowerCase();
+      let n=0; qs.forEach(w=>{if(title.includes(w))n+=5;if(keys.includes(w))n+=4;if(desc.includes(w))n+=1});
+      return [n,a];
+    }).filter(x=>x[0]>0).sort((a,b)=>b[0]-a[0]).slice(0,2).map(x=>x[1]);
+  }
+  function googleUrl(q){return 'https://www.google.com/search?q='+encodeURIComponent(q)}
+  function substackSearchUrl(q){return 'https://healthybuck.substack.com/search?q='+encodeURIComponent(q)}
+  function pubmedUrl(q,review){
+    let term='('+String(q).trim()+')';
+    if(review) term+=' AND review[Publication Type]';
+    return 'https://pubmed.ncbi.nlm.nih.gov/?term='+encodeURIComponent(term);
+  }
+  function ctaCard(){
+    return `<article class="result-card member-cta-card"><div class="result-type">Healthy Buck Membership</div><h4>Continue with Healthy Buck</h4><p>Get the full newsletter, member tools, and monthly curated digital products.</p><div class="result-links"><a class="result-link" href="${SUBSCRIBE_URL}">Start your free trial</a></div></article>`;
+  }
+  window.run=function(q0){
+    const input=document.getElementById('input');
+    const q=String(q0??input?.value??'').trim();
+    if(!q)return;
+    if(searchCount()>=2){
+      window.location.href=SUBSCRIBE_URL;
+      return;
+    }
+    markSearch();
+    document.getElementById('welcome')?.remove();
+    addMessage('user',q);
+    const arts=articleMatches(q);
+    const cards=[];
+    arts.forEach(a=>cards.push(resultCard('Healthy Buck',a[1],a[2],`<a class="result-link" href="${a[3]}" target="_blank" rel="noopener">Read post</a>`)));
+    if(!arts.length){
+      cards.push(resultCard('Healthy Buck','Search Healthy Buck posts',`Find Healthy Buck posts related to “${q}”.`,`<a class="result-link" href="${substackSearchUrl(q)}" target="_blank" rel="noopener">Search posts</a>`));
+    }
+    cards.push(resultCard('PubMed','Research articles','Find studies and reviews related to this topic.',`<a class="result-link" href="${pubmedUrl(q,false)}" target="_blank" rel="noopener">Find research</a><a class="result-link secondary" href="${pubmedUrl(q,true)}" target="_blank" rel="noopener">Find reviews</a>`));
+    cards.push(resultCard('Google','More results','See broader web results for this topic.',`<a class="result-link" href="${googleUrl(q)}" target="_blank" rel="noopener">Search Google</a>`));
+    cards.push(ctaCard());
+    addMessage('assistant',`<div class="meta"><span>Results</span></div><div class="answer-copy">Results for “${esc(q)}”</div><div class="result-grid">${cards.join('')}</div><div class="answer-note">Educational information only.</div>`);
+    if(input)input.value='';
+  };
+
+  const welcome=document.getElementById('welcome');
+  if(welcome){
+    const h=welcome.querySelector('h2'),p=welcome.querySelector('p');
+    if(h)h.textContent='What are you looking for?';
+    if(p)p.textContent='Search a health or wellness topic.';
+  }
+  const topTitle=document.querySelector('.topbar h1');
+  if(topTitle)topTitle.textContent='Healthy Buck Search';
+
+  document.addEventListener('submit',function(e){
+    const form=e.target.closest('form');
+    if(!form)return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    window.run();
+  },true);
+
+  document.addEventListener('click',function(e){
+    const trigger=e.target.closest('[data-browse],[data-path],[data-reask],[data-runpath],[data-center-search],.domain');
+    if(!trigger)return;
+    if(used()){
+      e.preventDefault();e.stopImmediatePropagation();window.location.href=SUBSCRIBE_URL;
+    }
+  },true);
+})();
+</script>
+
 </body>
 </html>
