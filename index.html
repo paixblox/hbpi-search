@@ -584,14 +584,14 @@ showPaths();
     return 'https://pubmed.ncbi.nlm.nih.gov/?term='+encodeURIComponent(term);
   }
   function ctaCard(){
-    return `<article class="result-card member-cta-card"><div class="result-type">Healthy Buck Membership</div><h4>Continue with Healthy Buck</h4><p>Get the full newsletter, member tools, and monthly curated digital products.</p><div class="result-links"><a class="result-link" href="${SUBSCRIBE_URL}">Start your free trial</a></div></article>`;
+    return `<article class="result-card member-cta-card"><div class="result-type">Healthy Buck Membership</div><h4>Continue with Healthy Buck</h4><p>Get the full newsletter, member tools, and monthly curated digital products.</p><div class="result-links"><a class="result-link" href="${SUBSCRIBE_URL}" target="_blank" rel="noopener">Start your free trial</a></div></article>`;
   }
   window.run=function(q0){
     const input=document.getElementById('input');
     const q=String(q0??input?.value??'').trim();
     if(!q)return;
     if(searchCount()>=2){
-      window.location.href=SUBSCRIBE_URL;
+      window.open(SUBSCRIBE_URL,'_blank','noopener');
       return;
     }
     markSearch();
@@ -630,8 +630,10 @@ showPaths();
   document.addEventListener('click',function(e){
     const trigger=e.target.closest('[data-browse],[data-path],[data-reask],[data-runpath],[data-center-search],.domain');
     if(!trigger)return;
-    if(used()){
-      e.preventDefault();e.stopImmediatePropagation();window.location.href=SUBSCRIBE_URL;
+    if(searchCount()>=2){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      window.open(SUBSCRIBE_URL,'_blank','noopener');
     }
   },true);
 })();
