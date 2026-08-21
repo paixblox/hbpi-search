@@ -740,10 +740,19 @@ showPaths();
     if(input)input.value='';
   };
 
+  function localJournalDateTime(){
+    const now=new Date();
+    const pad=n=>String(n).padStart(2,'0');
+    return {
+      date:`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`,
+      time:`${pad(now.getHours())}:${pad(now.getMinutes())}`
+    };
+  }
   function showJournalComposer(){
     if(!currentSearchExport)return;
     const sourcePreview=currentSearchExport.results.map((r,i)=>`${i+1}. ${esc2(r.title)}`).join('<br>');
-    const html=`<div class="journal-form"><h4>Create your provider journal PDF</h4><p>Keep this simple: add your notes and symptom timing. Your current search results and source links will be included automatically.</p><div class="journal-summary"><b>Search results ready to include</b><small>${sourcePreview}</small></div><div class="journal-fields"><div><label class="journal-label" for="journalNotes">Notes</label><textarea id="journalNotes" placeholder="Add anything you want your healthcare professional to know..."></textarea></div><div><label class="journal-label">Symptoms + date/time</label><div id="symptomRows"><div class="symptom-grid"><input data-symptom-name placeholder="Symptom"><input data-symptom-date type="date" aria-label="Symptom date"><input data-symptom-time type="time" aria-label="Symptom time"></div></div><button type="button" class="add-symptom" data-add-symptom="1">+ Add another symptom</button></div></div><div class="row"><button type="button" data-journal-export="1">Generate your PDF</button><button type="button" class="ghost" data-journal-cancel="1">Cancel</button></div><div class="export-muted">Educational record for discussion only. It does not provide medical advice, diagnosis, or treatment.</div></div>`;
+    const stamp=localJournalDateTime();
+    const html=`<div class="journal-form"><h4>Create your provider journal PDF</h4><p>Keep this simple: add your notes and symptom timing. Your current search results and source links will be included automatically.</p><div class="journal-summary"><b>Search results ready to include</b><small>${sourcePreview}</small></div><div class="journal-fields"><div><label class="journal-label" for="journalNotes">Notes</label><textarea id="journalNotes" placeholder="Add anything you want your healthcare professional to know..."></textarea></div><div><label class="journal-label">Symptoms + date/time</label><div id="symptomRows"><div class="symptom-grid"><input data-symptom-name placeholder="Symptom"><input data-symptom-date type="date" aria-label="Symptom date" value="${stamp.date}"><input data-symptom-time type="time" aria-label="Symptom time" value="${stamp.time}"></div></div><button type="button" class="add-symptom" data-add-symptom="1">+ Add another symptom</button></div></div><div class="row"><button type="button" data-journal-export="1">Generate your PDF</button><button type="button" class="ghost" data-journal-cancel="1">Cancel</button></div><div class="export-muted">Date and time are filled automatically from your device and can be edited. Educational record for discussion only. It does not provide medical advice, diagnosis, or treatment.</div></div>`;
     addMessage('assistant',html);
   }
   function symptomEntries(){
@@ -755,8 +764,9 @@ showPaths();
   }
   function addSymptomRow(){
     const wrap=document.getElementById('symptomRows');if(!wrap)return;
+    const stamp=localJournalDateTime();
     const row=document.createElement('div');row.className='symptom-grid';row.style.marginTop='7px';
-    row.innerHTML='<input data-symptom-name placeholder="Symptom"><input data-symptom-date type="date" aria-label="Symptom date"><input data-symptom-time type="time" aria-label="Symptom time">';wrap.appendChild(row);
+    row.innerHTML=`<input data-symptom-name placeholder="Symptom"><input data-symptom-date type="date" aria-label="Symptom date" value="${stamp.date}"><input data-symptom-time type="time" aria-label="Symptom time" value="${stamp.time}">`;wrap.appendChild(row);
   }
   function loadJsPdf(){
     if(window.jspdf?.jsPDF)return Promise.resolve(window.jspdf.jsPDF);
@@ -795,6 +805,108 @@ showPaths();
   document.addEventListener('click',function(e){const add=e.target.closest('[data-add-symptom]');if(add){e.preventDefault();addSymptomRow();return}const exp=e.target.closest('[data-journal-export]');if(exp){e.preventDefault();exportJournal();return}const cancel=e.target.closest('[data-journal-cancel]');if(cancel){e.preventDefault();const b=cancel.closest('.msg');if(b)b.remove();return}});
   function init(){addLeftGuideCard();addJournalSideCard();updateJournalSideCard()}
   document.addEventListener('DOMContentLoaded',init);init();
+})();
+</script>
+
+
+<!-- Healthy Buck mobile navigation + automated journal access patch -->
+<style id="hb-mobile-access-patch">
+.mobile-tools,.mobile-panel-backdrop,.mobile-journal-card{display:none}
+@media(max-width:720px){
+  .topbar{gap:10px}
+  .topbar>div:first-child{min-width:0;flex:1}
+  .topbar h1{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .topbar p{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mobile-tools{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+  .mobile-tools button{border:1px solid rgba(55,116,105,.24);background:rgba(255,255,255,.84);color:#176656;border-radius:8px;min-height:38px;padding:7px 9px;font:700 10px Arial,sans-serif;cursor:pointer}
+  .mobile-tools button:disabled{opacity:.45;cursor:not-allowed}
+
+  /* Keep the desktop sidebar available as an off-canvas mobile drawer. */
+  .sidebar{display:flex!important;position:fixed!important;z-index:1002;left:0;top:0;bottom:0;width:min(84vw,320px);height:100dvh;overflow:auto;border-radius:0 14px 14px 0!important;transform:translateX(-105%);transition:transform .22s ease;box-shadow:0 18px 42px rgba(18,63,42,.22)!important}
+  body.hb-mobile-topics-open .sidebar{transform:translateX(0)}
+  .mobile-panel-backdrop{position:fixed;inset:0;z-index:1001;background:rgba(16,45,37,.36);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+  body.hb-mobile-topics-open .mobile-panel-backdrop{display:block}
+
+  .mobile-journal-card{display:block;margin:12px 0 2px;padding:15px;border:1px solid rgba(55,116,105,.22);border-radius:12px;background:linear-gradient(135deg,rgba(255,255,255,.96),rgba(229,248,240,.93));box-shadow:0 8px 22px rgba(32,78,76,.08);font-family:Arial,sans-serif}
+  .mobile-journal-card .mj-eyeline{display:block;margin-bottom:4px;color:#5f7b76;font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+  .mobile-journal-card b{display:block;color:#175f53;font-size:15px;line-height:1.3;margin-bottom:5px}
+  .mobile-journal-card p{margin:0 0 11px;color:#57746f;font-size:11px;line-height:1.45}
+  .mobile-journal-card button{width:100%;min-height:46px;border:0;border-radius:9px;background:linear-gradient(135deg,#4fc6b2,#45b7cf);color:#fff;font:800 12px Arial,sans-serif;cursor:pointer;box-shadow:0 7px 16px rgba(39,130,119,.16)}
+  .mobile-journal-card button:active{transform:translateY(1px)}
+
+  /* Make the existing inline journal composer comfortable on phones. */
+  .journal-form{max-width:100%!important}
+  .journal-fields{grid-template-columns:1fr!important}
+  .symptom-grid{grid-template-columns:1fr!important}
+  .journal-form .row{display:grid!important;grid-template-columns:1fr!important;gap:8px!important}
+  .journal-form .row button{width:100%!important;min-height:44px}
+}
+</style>
+<script id="hb-mobile-access-script">
+(function(){
+  const MOBILE=()=>window.matchMedia('(max-width:720px)').matches;
+  let lastResultMsg=null;
+
+  function sideJournalButton(){ return document.getElementById('journalSideStart'); }
+
+  function openJournal(){
+    const btn=sideJournalButton();
+    if(btn && !btn.disabled){ btn.click(); return true; }
+    return false;
+  }
+
+  function ensureMobileTools(){
+    const topbar=document.querySelector('.topbar');
+    if(!topbar || document.getElementById('hbMobileTools')) return;
+    const tools=document.createElement('div');
+    tools.id='hbMobileTools'; tools.className='mobile-tools';
+    tools.innerHTML='<button type="button" id="hbTopicsBtn" aria-label="Open topic menu">☰ Topics</button><button type="button" id="hbJournalBtn" aria-label="Open provider journal" disabled>Journal 📄</button>';
+    topbar.appendChild(tools);
+    document.getElementById('hbTopicsBtn').addEventListener('click',()=>document.body.classList.add('hb-mobile-topics-open'));
+    document.getElementById('hbJournalBtn').addEventListener('click',()=>openJournal());
+  }
+
+  function ensureBackdrop(){
+    if(document.getElementById('hbMobileBackdrop')) return;
+    const bg=document.createElement('div'); bg.id='hbMobileBackdrop'; bg.className='mobile-panel-backdrop';
+    bg.addEventListener('click',()=>document.body.classList.remove('hb-mobile-topics-open'));
+    document.body.appendChild(bg);
+    document.addEventListener('keydown',e=>{if(e.key==='Escape')document.body.classList.remove('hb-mobile-topics-open')});
+    document.querySelector('.sidebar')?.addEventListener('click',e=>{if(MOBILE() && e.target.closest('.domain,.newchat'))document.body.classList.remove('hb-mobile-topics-open')});
+  }
+
+  function syncJournalAvailability(){
+    const source=sideJournalButton();
+    const mobile=document.getElementById('hbJournalBtn');
+    if(mobile) mobile.disabled=!(source && !source.disabled);
+  }
+
+  function addMobileJournalCard(resultMsg){
+    if(!MOBILE() || !resultMsg || resultMsg.dataset.mobileJournalAdded==='1') return;
+    const source=sideJournalButton();
+    if(!source || source.disabled) return;
+    resultMsg.dataset.mobileJournalAdded='1';
+    const oldNote=resultMsg.querySelector('.answer-note');
+    if(oldNote) oldNote.innerHTML='Educational information only. Use <b>Add to Journal</b> below to build a clinician-friendly PDF from these results.';
+    const card=document.createElement('div');
+    card.className='mobile-journal-card';
+    card.innerHTML='<span class="mj-eyeline">For your next appointment</span><b>Add these results to your Journal</b><p>Your current search sources are ready to include automatically with your notes and symptom timing.</p><button type="button">Add to Journal + Generate PDF</button>';
+    card.querySelector('button').addEventListener('click',openJournal);
+    resultMsg.querySelector('.bubble')?.appendChild(card);
+    lastResultMsg=resultMsg;
+  }
+
+  function scan(){
+    ensureMobileTools(); ensureBackdrop(); syncJournalAvailability();
+    const resultMsgs=[...document.querySelectorAll('.msg.assistant')].filter(m=>m.querySelector('.result-grid'));
+    if(resultMsgs.length) addMobileJournalCard(resultMsgs[resultMsgs.length-1]);
+  }
+
+  const observer=new MutationObserver(()=>requestAnimationFrame(scan));
+  observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['disabled']});
+  document.addEventListener('DOMContentLoaded',scan);
+  window.addEventListener('resize',()=>{if(!MOBILE())document.body.classList.remove('hb-mobile-topics-open');scan()});
+  scan();
 })();
 </script>
 
